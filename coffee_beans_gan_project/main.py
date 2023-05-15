@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Created on 2023/05/10
+tech:
+(Real=False, fake=True)
 
 @author: Shawn YH Lee
 """
@@ -45,7 +47,7 @@ if argparse_module:
     parser.add_argument('--training_data_path',type=str,default='./training_process_data/',help='output training data path')
     parser.add_argument('--image_size',type=int,default= 64,help='image size')
     parser.add_argument('--num_classes',type=int,default= 2,help='num classes')
-    parser.add_argument('--batch_size',type=int,default= 5,help='batch_size')
+    parser.add_argument('--batch_size',type=int,default= 256,help='batch_size')
     parser.add_argument('--num_epoch',type=int,default= 100,help='num_epoch')
     parser.add_argument('--nz',type=int,default= 100)
     parser.add_argument('--ngf',type=int,default= 64)
@@ -64,8 +66,14 @@ if argparse_module:
 """----------function----------"""
 train_transform = transforms.Compose([
     transforms.ToTensor(), 
-    transforms.Resize((args.image_size,args.image_size)),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225]),
+    transforms.Resize((args.image_size,args.image_size),interpolation = 3),
+    transforms.RandomHorizontalFlip(p=0.5),  # 水平翻轉，概率為0.5
+    transforms.RandomVerticalFlip(p=0.5),    # 垂直翻轉，概率為0.5
+    #transforms.RandomRotation(90),
+    transforms.ColorJitter(brightness=0.5, contrast=0.5) ,
+    #transforms.RandomErasing(p=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3), value='random'),
+
+    transforms.Normalize(mean=[0.5, 0.5, 0.5],std=[0.5, 0.5, 0.5]),
 ])
 def show_loss_graph():
     import matplotlib.pyplot as plt
@@ -92,10 +100,12 @@ if __name__ == '__main__':
 
     modelG = dcgan.NetG(args.nz,args.ngf,args.nc).to(device)
     modelD = dcgan.NetD(args.nc,args.ndf).to(device)
-
+    modelG.load_state_dict(torch.load(args.modelpath+args.modelG+'.pth'))
+    modelD.load_state_dict(torch.load(args.modelpath+args.modelD+'.pth'))
+    
     optimizerG = torch.optim.Adam(modelG.parameters(), lr=args.lr,amsgrad=False)
     optimizerD = torch.optim.Adam(modelD.parameters(), lr=args.lr,amsgrad=False)
-    loss = nn.CrossEntropyLoss()
+    loss = nn.BCELoss()
     if tqdm_module:
         pbar = tqdm(range(args.num_epoch),desc='Epoch',unit='epoch',maxinterval=1)
     if torchsummary_module:
@@ -107,17 +117,17 @@ if __name__ == '__main__':
         modelG.train()
         for i ,data in enumerate(train_loader):
             #train modelD let true image be 1
-            optimizerD.zero_grad()
+            modelD.zero_grad()
             train_pred = modelD(data[0].to(device)).view(-1)
-            label_true = torch.full((data[0].size(0),),1,dtype=torch.float,device=device)
+            label_true = torch.full((data[0].size(0),),0,dtype=torch.float,device=device)
             batch_loss_true = loss(train_pred, label_true)
 
             #modelG create fakeimage
-            noise = torch.randn(args.batch_size,args.nz,1,1).to(device)
+            noise = torch.randn(data[0].size(0),args.nz,1,1).to(device)
             fake = modelG(noise)
 
             #trian modelD fake image be 0
-            label_false = torch.full((data[0].size(0),),0,dtype=torch.float,device=device)  
+            label_false = torch.full((data[0].size(0),),1,dtype=torch.float,device=device)  
             train_pred = modelD(fake.detach()).view(-1)#.detach()不計算此tensor梯度
             batch_loss_false = loss(train_pred, label_false)
             # update model D
@@ -125,30 +135,31 @@ if __name__ == '__main__':
             batch_loss_modelD.backward()
             optimizerD.step()
 
-            # train model G
-            optimizerG.zero_grad()
+            # train model G fake vector
+            modelG.zero_grad()
             output = modelD(fake).view(-1)
             batch_loss_modelG = loss(output,label_true)
             batch_loss_modelG.backward()
             # update G
             optimizerG.step()
-            # update pbar
-            pbar.set_postfix({'modelD loss':batch_loss_modelD.item(),'modelG loss':batch_loss_modelG.item()})
-            #append loss to plot
-            modelD_loss_point.append(batch_loss_modelD.item())
-            modelG_loss_point.append(batch_loss_modelG.item())
 
-        if (epoch+1)== args.num_epoch:
+        # update pbar
+        pbar.set_postfix({'modelD loss':batch_loss_modelD.item(),'modelG loss':batch_loss_modelG.item()})
+        #append loss to plot
+        modelD_loss_point.append(batch_loss_modelD.item())
+        modelG_loss_point.append(batch_loss_modelG.item())
+
+        if (epoch+1)%5 == 0:
             # save model
-            torch.save(modelD.state_dict(), args.modelpath +args.modelD +'.pth')
-            torch.save(modelG.state_dict(), args.modelpath +args.modelG +'.pth')
+            torch.save(modelD.state_dict(), args.modelpath +args.modelD + '.pth')
+            torch.save(modelG.state_dict(), args.modelpath +args.modelG + '.pth')
             
-    with torch.no_grad():
-        # fake image
-        noise = torch.randn(1,args.nz,1,1).to(device)
-        fake = modelG(noise.detach())
-        fake_image = transforms.ToPILImage()(fake[0].cpu()).convert('RGB')
-        fake_image.save(args.training_data_path + "fake.jpg")
+            with torch.no_grad():
+                # fake image
+                noise = torch.randn(1,args.nz,1,1).to(device)
+                fake = modelG(noise.detach())
+                fake_image = transforms.ToPILImage()(fake[0].cpu()).convert('RGB')
+                fake_image.save(args.training_data_path + str(epoch+1) + "fake.jpg")
         
 
     if show_GANloss_switch:
