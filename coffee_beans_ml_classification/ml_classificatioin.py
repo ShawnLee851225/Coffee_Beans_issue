@@ -33,7 +33,7 @@ if argparse_module:
     parser.add_argument('--num_classes',type=int,default= 2,help='num classes')
     parser.add_argument('--model',type=str,default='xgboost')
     parser.add_argument('--lr',type= int,default= 0.3,help='learningrate')
-    parser.add_argument('--n_estimators',type=int,default=100)
+    parser.add_argument('--n_estimators',type=int,default=200)
     args = parser.parse_args()
 """----------argparse init end----------"""
 """----------function----------"""
