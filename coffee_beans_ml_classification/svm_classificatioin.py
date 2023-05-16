@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from xgboost import XGBClassifier
 """----------import package end----------"""
 
 """----------module switch setting----------"""
@@ -28,9 +29,11 @@ if argparse_module:
     parser.add_argument('--database_path',type=str,default='../coffee_beans_classification_project/database/')
     parser.add_argument('--modelpath',type=str,default='./model/',help='output model save path')
     parser.add_argument('--training_data_path',type=str,default='./training_process_data/',help='output training data path')
-    parser.add_argument('--image_size',type=int,default= 30,help='image size')
+    parser.add_argument('--image_size',type=int,default= 64,help='image size')
     parser.add_argument('--num_classes',type=int,default= 2,help='num classes')
-
+    parser.add_argument('--model',type=str,default='xgboost')
+    parser.add_argument('--lr',type= int,default= 0.3,help='learningrate')
+    parser.add_argument('--n_estimators',type=int,default=100)
     args = parser.parse_args()
 """----------argparse init end----------"""
 """----------function----------"""
@@ -65,17 +68,20 @@ def data_process(classes_dir):
 """----------main----------"""
 if __name__ == '__main__':
     X_train,X_test,y_train,y_test = data_process(os.listdir(args.database_path))
-    
-    model = svm.SVC(kernel='linear', C= 1.0)
     #影像降維
     X_train=X_train.reshape(len(X_train),-1)
     X_test = X_test.reshape(len(X_test),-1)
-    print(X_train.dtype,y_train.dtype)
+    if args.model == 'svm':
+        model = svm.SVC(kernel='linear', C= 1.0)
+    elif args.model == 'xgboost':
+        model = XGBClassifier(n_estimators=args.n_estimators, learning_rate= args.lr)
     print('model fit')
     model.fit(X_train,y_train)
+    train_acc = model.score(X_train,y_train)
+    print(f'train_acc: {train_acc}')
     #pred = model.predict(X_test)
-    acc = model.score(X_test,y_test)
-    print(f'accuracy: {acc}')
+    test_acc = model.score(X_test,y_test)
+    print(f'test_acc: {test_acc}')
 
 
         
