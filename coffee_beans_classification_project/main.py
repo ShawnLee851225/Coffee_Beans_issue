@@ -34,7 +34,7 @@ label_map ={
 tqdm_module = True #progress bar
 argparse_module = True  #don't False
 Image_transfer_np = False   #transfer dataset to np if not .npy
-torchsummary_module = False  #model Visual
+torchsummary_module = True  #model Visual
 check_image_module = False  #Check image is normal
 show_line_graph_switch = True 
 save_training_progress_csv_switch =True  
@@ -178,7 +178,6 @@ def model_train():
     for i, data in enumerate(train_loader):
         optimizer.zero_grad()   # 用 optimizer 將 model 參數的 gradient 歸零
         train_pred = model(data[0].to(device))  # 利用 model 得到預測的機率分佈 這邊實際上就是去呼叫 model 的 forward 函數
-        print(train_pred.shape)
         batch_loss = loss(train_pred, data[1].to(device))   # 計算 loss （注意 prediction 跟 label 必須同時在 CPU 或是 GPU 上）
         batch_loss.backward()   # 利用 back propagation 算出每個參數的 gradient
         optimizer.step()    # 以 optimizer 用 gradient 更新參數值
