@@ -2,6 +2,12 @@
 """
 Created on 2023/05/16
 
+Result: 
+    SVM: trainacc:1.0, testacc:0.8682
+    SVM + image_rgb_mean = trainacc:0.5572, testacc:0.5831
+    xgboost: trainacc:1.0, testacc:0.8693
+    xgboost + image_rgb_mean: trainacc:0.87, testacc:0.5820
+
 @author: Shawn YH Lee
 """
 """----------import package----------"""
@@ -31,9 +37,9 @@ if argparse_module:
     parser.add_argument('--training_data_path',type=str,default='./training_process_data/',help='output training data path')
     parser.add_argument('--image_size',type=int,default= 64,help='image size')
     parser.add_argument('--num_classes',type=int,default= 2,help='num classes')
-    parser.add_argument('--model',type=str,default='svm')
+    parser.add_argument('--model',type=str,default='xgboost',help=':option: svm, xgboost')
     parser.add_argument('--lr',type= int,default= 0.3,help='learningrate')
-    parser.add_argument('--n_estimators',type=int,default=100)
+    parser.add_argument('--n_estimators',type=int,default=200)
     args = parser.parse_args()
 """----------argparse init end----------"""
 """----------function----------"""
@@ -97,15 +103,17 @@ def data_process_means(classes_dir):
 
 """----------main----------"""
 if __name__ == '__main__':
-    #X_train,X_test,y_train,y_test = data_process(os.listdir(args.database_path))
-    X_train,X_test,y_train,y_test = data_process_means(os.listdir(args.database_path))
+    X_train,X_test,y_train,y_test = data_process(os.listdir(args.database_path))
+    #X_train,X_test,y_train,y_test = data_process_means(os.listdir(args.database_path))
     #影像降維
     X_train=X_train.reshape(len(X_train),-1)
     X_test = X_test.reshape(len(X_test),-1)
     if args.model == 'svm':
         model = svm.SVC(kernel='linear', C= 1.0)
+        print('model= svm')
     elif args.model == 'xgboost':
         model = XGBClassifier(n_estimators=args.n_estimators, learning_rate= args.lr)
+        print('model= xgboost')
     print('model fit')
     model.fit(X_train,y_train)
     train_acc = model.score(X_train,y_train)
