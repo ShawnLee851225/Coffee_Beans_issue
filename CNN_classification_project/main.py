@@ -38,6 +38,7 @@ torchsummary_module = True  #model Visual
 check_image_module = False  #Check image is normal
 show_line_graph_switch = True 
 save_training_progress_csv_switch =True  
+model_save_switch =False
 """----------module switch setting end----------"""
 
 """----------argparse init----------"""
@@ -52,7 +53,7 @@ if argparse_module:
     parser.add_argument('--num_classes',type=int,default= 2,help='num classes')
     parser.add_argument('--batch_size',type=int,default= 64,help='batch_size')
     parser.add_argument('--num_epoch',type=int,default= 100,help='num_epoch')
-    parser.add_argument('--model',type= str,default='resnet18',help='model')
+    parser.add_argument('--model',type= str,default='mobilenetv3_small',help='option: resnet18 , mobilenetv3_small')
     parser.add_argument('--optimizer',type= str,default='Ranger',help='optimizer')
     parser.add_argument('--loss',type= str,default='CrossEntropyLoss',help='Loss')
     parser.add_argument('--lr',type= int,default=1e-3,help='learningrate')
@@ -151,10 +152,22 @@ def loss_select():
     print(f"Select loss function:{args.loss}")
     return loss
 def ds_preprocessing():
-    bad_x=np.load(args.numpy_data_path+'bad_x.npy')
-    bad_y=np.load(args.numpy_data_path+'bad_y.npy')
-    good_x=np.load(args.numpy_data_path+'good_x.npy')
-    good_y=np.load(args.numpy_data_path+'good_y.npy')
+    print("Read Image from root")
+    bad_x,bad_y = readfile(args.database_path0)
+    good_x,good_y = readfile(args.database_path1)
+    """----------Image_transfer_np----------"""
+    if Image_transfer_np:
+        print("Image_transfer_np")
+        np.save(args.numpy_data_path+'bad_x.npy',bad_x)
+        np.save(args.numpy_data_path+'bad_y.npy',bad_y)
+        np.save(args.numpy_data_path+'good_x.npy',good_x)
+        np.save(args.numpy_data_path+'good_y.npy',good_y)
+    
+        bad_x=np.load(args.numpy_data_path+'bad_x.npy')
+        bad_y=np.load(args.numpy_data_path+'bad_y.npy')
+        good_x=np.load(args.numpy_data_path+'good_x.npy')
+        good_y=np.load(args.numpy_data_path+'good_y.npy')
+    """----------Image_transfer_np end----------"""
     trainx=np.concatenate([bad_x,good_x])
     trainy=np.concatenate([bad_y,good_y])
     train_set=ImgDataset(trainx, trainy,train_transform)
@@ -188,7 +201,8 @@ def model_train():
     train_point.append((train_acc_percent,train_loss_average))
     pbar.set_postfix({'Train Acc':train_acc_percent,'Train loss':train_loss_average})   
     if (epoch+1) == args.num_epoch:
-        save_model()
+        if model_save_switch:
+            save_model()
 def device_auto_detect():
     device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
     print(f'device:{device}')
@@ -209,17 +223,6 @@ def save_training_progress_csv():
     np.savetxt( args.training_data_path + args.model +'.csv', train_point,delimiter=',',fmt = '% s')
     #np.savetxt('ours_test.csv', test_point,delimiter=',',fmt = '% s') not use
 """----------function end----------"""
-
-"""----------Image_transfer_np----------"""
-if Image_transfer_np:
-    print("Image_transfer_np")
-    bad_x,bad_y = readfile(args.database_path0)
-    good_x,good_y = readfile(args.database_path1)
-    np.save(args.numpy_data_path+'bad_x.npy',bad_x)
-    np.save(args.numpy_data_path+'bad_y.npy',bad_y)
-    np.save(args.numpy_data_path+'good_x.npy',good_x)
-    np.save(args.numpy_data_path+'good_y.npy',good_y)
-"""----------Image_transfer_np end----------"""
 
 """----------main----------"""
 if __name__ == '__main__':
