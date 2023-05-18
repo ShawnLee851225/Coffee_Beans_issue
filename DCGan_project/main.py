@@ -41,7 +41,7 @@ show_GANloss_switch = True
 """----------argparse init----------"""
 if argparse_module:    
     parser = argparse.ArgumentParser(description = 'train model')
-    parser.add_argument('--database_path',type=str,default='../coffee_beans_classification_project/database/')
+    parser.add_argument('--database_path',type=str,default='../CNN_classification_project/database/')
     parser.add_argument('--modelpath',type=str,default='./model/',help='output model save path')
     parser.add_argument('--numpy_data_path',type=str,default='./numpydata/',help='output numpy data')
     parser.add_argument('--training_data_path',type=str,default='./training_process_data/',help='output training data path')
@@ -67,10 +67,10 @@ if argparse_module:
 train_transform = transforms.Compose([
     transforms.ToTensor(), 
     transforms.Resize((args.image_size,args.image_size),interpolation = 3),
-    transforms.RandomHorizontalFlip(p=0.5),  # 水平翻轉，概率為0.5
-    transforms.RandomVerticalFlip(p=0.5),    # 垂直翻轉，概率為0.5
+    #transforms.RandomHorizontalFlip(p=0.5),  # 水平翻轉，概率為0.5
+    #transforms.RandomVerticalFlip(p=0.5),    # 垂直翻轉，概率為0.5
     #transforms.RandomRotation(90),
-    transforms.ColorJitter(brightness=0.5, contrast=0.5) ,
+    #transforms.ColorJitter(brightness=0.5, contrast=0.5) ,
     #transforms.RandomErasing(p=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3), value='random'),
 
     transforms.Normalize(mean=[0.5, 0.5, 0.5],std=[0.5, 0.5, 0.5]),
@@ -164,12 +164,5 @@ if __name__ == '__main__':
 
     if show_GANloss_switch:
         show_loss_graph()
-
-
-            
-
-            
-
-
 
 """----------main end----------"""

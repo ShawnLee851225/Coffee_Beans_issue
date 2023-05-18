@@ -32,7 +32,7 @@ torchsummary_module = False
 """----------argparse init----------"""
 if argparse_module:    
     parser = argparse.ArgumentParser(description = 'train model')
-    parser.add_argument('--database_path',type=str,default='../coffee_beans_classification_project/database/')
+    parser.add_argument('--database_path',type=str,default='../CNN_classification_project/database/')
     parser.add_argument('--modelpath',type=str,default='./model/',help='output model save path')
     parser.add_argument('--training_data_path',type=str,default='./training_process_data/',help='output training data path')
     parser.add_argument('--image_size',type=int,default= 64,help='image size')
