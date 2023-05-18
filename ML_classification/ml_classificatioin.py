@@ -7,7 +7,8 @@ Result:
     SVM + image_rgb_mean = trainacc:0.5572, testacc:0.5831
     xgboost: trainacc:1.0, testacc:0.8693
     xgboost + image_rgb_mean: trainacc:0.87, testacc:0.5820
-
+    RandomForestClassification:  trainacc:1.0, testacc:0.8596
+    adaBoost : trainacc:0.9659, testacc:0.8261
 @author: Shawn YH Lee
 """
 """----------import package----------"""
@@ -21,6 +22,7 @@ from torchvision import datasets
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from xgboost import XGBClassifier
+from sklearn.ensemble import RandomForestClassifier,AdaBoostClassifier
 """----------import package end----------"""
 
 """----------module switch setting----------"""
@@ -37,7 +39,7 @@ if argparse_module:
     parser.add_argument('--training_data_path',type=str,default='./training_process_data/',help='output training data path')
     parser.add_argument('--image_size',type=int,default= 64,help='image size')
     parser.add_argument('--num_classes',type=int,default= 2,help='num classes')
-    parser.add_argument('--model',type=str,default='xgboost',help=':option: svm, xgboost')
+    parser.add_argument('--model',type=str,default='AdaBoost',help=':option: svm, xgboost, RandomForest,AdaBoost')
     parser.add_argument('--lr',type= int,default= 0.3,help='learningrate')
     parser.add_argument('--n_estimators',type=int,default=200)
     args = parser.parse_args()
@@ -114,6 +116,12 @@ if __name__ == '__main__':
     elif args.model == 'xgboost':
         model = XGBClassifier(n_estimators=args.n_estimators, learning_rate= args.lr)
         print('model= xgboost')
+    elif args.model == 'RandomForest': 
+        model = RandomForestClassifier(n_estimators=args.n_estimators, criterion = 'gini')
+        print('model= RandomForestClassifier')
+    elif args.model == 'AdaBoost':
+        model = AdaBoostClassifier(n_estimators = args.n_estimators)
+        print('model= AdaBoost')
     print('model fit')
     model.fit(X_train,y_train)
     train_acc = model.score(X_train,y_train)
