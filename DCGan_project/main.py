@@ -35,30 +35,31 @@ label_map ={
 """----------module switch setting----------"""
 argparse_module = True  #don't False
 tqdm_module =True
-torchsummary_module = False
+torchsummary_module = True
 show_GANloss_switch = True
+load_modelweights = False
 """----------module switch setting end----------"""
 """----------argparse init----------"""
 if argparse_module:    
     parser = argparse.ArgumentParser(description = 'train model')
-    parser.add_argument('--database_path',type=str,default='../CNN_classification_project/database/')
+    parser.add_argument('--database_path',type=str,default='./database/')
+    parser.add_argument('--database_path1',type=str,default='../CNN_classification_project/database/')
     parser.add_argument('--modelpath',type=str,default='./model/',help='output model save path')
     parser.add_argument('--numpy_data_path',type=str,default='./numpydata/',help='output numpy data')
     parser.add_argument('--training_data_path',type=str,default='./training_process_data/',help='output training data path')
-    parser.add_argument('--image_size',type=int,default= 64,help='image size')
+    parser.add_argument('--image_size',type=int,default= 400,help='image size')
     parser.add_argument('--num_classes',type=int,default= 2,help='num classes')
-    parser.add_argument('--batch_size',type=int,default= 256,help='batch_size')
+    parser.add_argument('--batch_size',type=int,default= 64,help='batch_size')
     parser.add_argument('--num_epoch',type=int,default= 100,help='num_epoch')
-    parser.add_argument('--nz',type=int,default= 100)
-    parser.add_argument('--ngf',type=int,default= 64)
-    parser.add_argument('--ndf',type=int,default= 64)
+    parser.add_argument('--nz',type=int,default= 200)
+    parser.add_argument('--ngf',type=int,default= 16)
+    parser.add_argument('--ndf',type=int,default= 16)
     parser.add_argument('--nc',type=int,default= 3)
 
     parser.add_argument('--modelD',type= str,default='modelD')
     parser.add_argument('--modelG',type= str,default='modelG')
-    parser.add_argument('--optimizer',type= str,default='Ranger',help='optimizer')
-    parser.add_argument('--loss',type= str,default='CrossEntropyLoss',help='Loss')
-    parser.add_argument('--lr',type= int,default=1e-3,help='learningrate')
+    parser.add_argument('--lrG',type= int,default=1e-3,help='lr for netG')
+    parser.add_argument('--lrD',type= int,default=1e-3,help='lr for NetD')
 
     args = parser.parse_args()
 """----------argparse init end----------"""
@@ -91,20 +92,23 @@ def show_loss_graph():
 """----------main----------"""
 if __name__ == '__main__':
     
-    train_set = datasets.ImageFolder(root=args.database_path,transform=train_transform) #輸出(圖片tensor,label)
+    train_set = datasets.ImageFolder(root=args.database_path1,transform=train_transform) #輸出(圖片tensor,label)
     train_loader = DataLoader(dataset = train_set,batch_size = args.batch_size,shuffle=True,pin_memory=True)
 
     device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
     print(f'device:{device}')
     image_shape = (3,args.image_size,args.image_size)
 
-    modelG = dcgan.NetG(args.nz,args.ngf,args.nc).to(device)
-    modelD = dcgan.NetD(args.nc,args.ndf).to(device)
-    modelG.load_state_dict(torch.load(args.modelpath+args.modelG+'.pth'))
-    modelD.load_state_dict(torch.load(args.modelpath+args.modelD+'.pth'))
+    #modelG = dcgan.NetG(args.nz,args.ngf,args.nc).to(device)
+    #modelD = dcgan.NetD(args.nc,args.ndf).to(device)
+    modelD = dcgan.NetD_custom(args.nc,args.ndf).to(device)
+    modelG = dcgan.NetG_custom(args.nz,args.ngf,args.nc).to(device)
+    if load_modelweights:
+        modelG.load_state_dict(torch.load(args.modelpath+args.modelG+'.pth'))
+        modelD.load_state_dict(torch.load(args.modelpath+args.modelD+'.pth'))
     
-    optimizerG = torch.optim.Adam(modelG.parameters(), lr=args.lr,amsgrad=False)
-    optimizerD = torch.optim.Adam(modelD.parameters(), lr=args.lr,amsgrad=False)
+    optimizerG = torch.optim.Adam(modelG.parameters(), lr=args.lrG,amsgrad=False)
+    optimizerD = torch.optim.Adam(modelD.parameters(), lr=args.lrD,amsgrad=False)
     loss = nn.BCELoss()
     if tqdm_module:
         pbar = tqdm(range(args.num_epoch),desc='Epoch',unit='epoch',maxinterval=1)
@@ -150,18 +154,15 @@ if __name__ == '__main__':
         modelG_loss_point.append(batch_loss_modelG.item())
 
         if (epoch+1)%5 == 0:
-            # save model
-            torch.save(modelD.state_dict(), args.modelpath +args.modelD + '.pth')
-            torch.save(modelG.state_dict(), args.modelpath +args.modelG + '.pth')
-            
             with torch.no_grad():
                 # fake image
                 noise = torch.randn(1,args.nz,1,1).to(device)
                 fake = modelG(noise.detach())
                 fake_image = transforms.ToPILImage()(fake[0].cpu()).convert('RGB')
                 fake_image.save(args.training_data_path + str(epoch+1) + "fake.jpg")
-        
-
+                # save model
+    torch.save(modelD.state_dict(), args.modelpath +args.modelD + '.pth')
+    torch.save(modelG.state_dict(), args.modelpath +args.modelG + '.pth')
     if show_GANloss_switch:
         show_loss_graph()
 
