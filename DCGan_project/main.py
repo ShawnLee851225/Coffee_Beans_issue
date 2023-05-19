@@ -51,7 +51,7 @@ if argparse_module:
     parser.add_argument('--num_classes',type=int,default= 2,help='num classes')
     parser.add_argument('--batch_size',type=int,default= 64,help='batch_size')
     parser.add_argument('--num_epoch',type=int,default= 100,help='num_epoch')
-    parser.add_argument('--nz',type=int,default= 200)
+    parser.add_argument('--nz',type=int,default= 50)
     parser.add_argument('--ngf',type=int,default= 16)
     parser.add_argument('--ndf',type=int,default= 16)
     parser.add_argument('--nc',type=int,default= 3)
