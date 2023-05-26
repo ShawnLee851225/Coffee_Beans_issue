@@ -9,6 +9,7 @@ import argparse
 import os
 import time
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 from PIL import Image
@@ -34,11 +35,11 @@ label_map ={
 tqdm_module = True #progress bar
 argparse_module = True  #don't False
 Image_transfer_np = False   #transfer dataset to np if not .npy
-torchsummary_module = True  #model Visual
+torchsummary_module = False  #model Visual
 check_image_module = False  #Check image is normal
 show_line_graph_switch = True 
 save_training_progress_csv_switch =True  
-model_save_switch =False
+model_save_switch =True
 """----------module switch setting end----------"""
 
 """----------argparse init----------"""
@@ -49,12 +50,12 @@ if argparse_module:
     parser.add_argument('--modelpath',type=str,default='./model/',help='output model save path')
     parser.add_argument('--numpy_data_path',type=str,default='./numpydata/',help='output numpy data')
     parser.add_argument('--training_data_path',type=str,default='./training_process_data/',help='output training data path')
-    parser.add_argument('--image_size',type=int,default= 400,help='image size')
+    parser.add_argument('--image_size',type=int,default= 50,help='image size')
     parser.add_argument('--num_classes',type=int,default= 2,help='num classes')
     parser.add_argument('--batch_size',type=int,default= 64,help='batch_size')
-    parser.add_argument('--num_epoch',type=int,default= 100,help='num_epoch')
+    parser.add_argument('--num_epoch',type=int,default= 50,help='num_epoch')
     parser.add_argument('--model',type= str,default='mobilenetv3_small',help='option: resnet18 , mobilenetv3_small')
-    parser.add_argument('--optimizer',type= str,default='Ranger',help='optimizer')
+    parser.add_argument('--optimizer',type= str,default='Ranger',help='option: Adam, RAdam, Ranger, SGD')
     parser.add_argument('--loss',type= str,default='CrossEntropyLoss',help='Loss')
     parser.add_argument('--lr',type= int,default=1e-3,help='learningrate')
 
@@ -173,6 +174,7 @@ def ds_preprocessing():
     train_set=ImgDataset(trainx, trainy,train_transform)
     train_loader=DataLoader(train_set,batch_size = args.batch_size,shuffle=True,pin_memory=True)
     if check_image_module:
+        print("check image")
         #check image
         import matplotlib.pyplot as plt
         plt.figure(dpi=600)
@@ -221,6 +223,8 @@ def show_line_graph():
     #plt.show() can close
 def save_training_progress_csv():
     np.savetxt( args.training_data_path + args.model +'.csv', train_point,delimiter=',',fmt = '% s')
+    df =pd.DataFrame(train_point)
+    df.to_excel(args.training_data_path + args.model + '.xlsx', index=True)
     #np.savetxt('ours_test.csv', test_point,delimiter=',',fmt = '% s') not use
 """----------function end----------"""
 

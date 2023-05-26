@@ -6,14 +6,16 @@ Created on 2023/05/10
 """
 
 """----------import package----------"""
-from main import ds_preprocessing,model_select,device_auto_detect,\
-loss_select
 import argparse
 import numpy as np
 import torch
+import torch.nn as nn
+import os
+from PIL import Image
 from torchsummary import summary
 from tqdm import tqdm
-
+from torchvision import transforms
+from torch.utils.data import DataLoader, Dataset
 """----------import package end----------"""
 
 """----------module switch setting----------"""
@@ -32,6 +34,7 @@ test_point=[]
 #best_acc=0.0
 metrics=np.zeros((2,2),dtype=np.int32)
 label_map =['bad','good']
+
 """----------variable init end----------"""
 
 """----------argparse init----------"""
@@ -42,11 +45,11 @@ if argparse_module:
     parser.add_argument('--modelpath',type=str,default='./model/',help='output model save path')
     parser.add_argument('--numpy_data_path',type=str,default='./numpydata/',help='output numpy data')
     parser.add_argument('--training_data_path',type=str,default='./training_process_data/',help='output training data path')
-    parser.add_argument('--image_size',type=int,default= 400,help='image size')
+    parser.add_argument('--image_size',type=int,default= 50,help='image size')
     parser.add_argument('--num_classes',type=int,default= 2,help='num classes')
     parser.add_argument('--batch_size',type=int,default= 64,help='batch_size')
     parser.add_argument('--num_epoch',type=int,default= 1,help='num_epoch')
-    parser.add_argument('--model',type= str,default='resnet18',help='model')
+    parser.add_argument('--model',type= str,default='mobilenetv3_small',help='mobilenetv3_small, resnet18')
     parser.add_argument('--optimizer',type= str,default='Ranger',help='optimizer')
     parser.add_argument('--loss',type= str,default='CrossEntropyLoss',help='Loss')
     parser.add_argument('--lr',type= int,default=1e-3,help='learningrate')
@@ -60,6 +63,111 @@ if tqdm_module:
 """----------tqdm init end----------"""
 
 """----------function----------"""
+train_transform = transforms.Compose([
+ 
+    transforms.ToTensor(), # 將圖片轉成 Tensor，並把數值 normalize 到 [0,1] (data normalization)取值范围为[0, 255]的PIL.Image，转换成形状为[C, H, W]，取值范围是[0, 1.0]的torch.FloadTensor；形状为[H, W, C]的numpy.ndarray，转换成形状为[C, H, W]，取值范围是[0, 1.0]的torch.FloadTensor。
+    transforms.Resize((args.image_size,args.image_size)),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225]),#做正規化[-1~1]之間
+])
+class ImgDataset(Dataset):
+    def __init__(self, x, y=None, transform=None):
+        self.x = x
+        # label is required to be a LongTensor
+        self.y = y
+        if y is not None:
+            self.y = torch.LongTensor(y)
+        self.transform = transform
+    def __len__(self):
+        return len(self.x)
+    def __getitem__(self, index):
+        X = self.x[index]
+        if self.transform is not None:
+            X = self.transform(X)
+        if self.y is not None:
+            Y = self.y[index]
+            return X, Y
+        else:
+            return X
+def readfile(path):
+    if (path==args.database_path0):  
+        image_dir = os.listdir(path)
+        x=np.zeros((len(image_dir), args.image_size, args.image_size, 3),dtype=np.uint8)
+        n= len(image_dir)
+        y=np.zeros(len(image_dir))
+
+        for i ,file in enumerate(image_dir):
+           path=os.path.join(args.database_path0, file)
+           image = Image.open(path)
+           image = image.resize((args.image_size, args.image_size))    
+           image = np.array(image)
+           x[i,:,:]=image
+        return x,y
+    elif(path==args.database_path1):
+        image_dir = os.listdir(path)
+        x=np.zeros((len(image_dir), args.image_size, args.image_size, 3),dtype=np.uint8)
+        n= len(image_dir)
+        y=np.ones(len(image_dir))
+        for i ,file in enumerate(image_dir):
+           path=os.path.join(args.database_path1, file)
+           image = Image.open(path)
+           image = image.resize((args.image_size, args.image_size))    
+           image = np.array(image)
+           x[i,:,:]=image
+        return x,y
+def ds_preprocessing():
+    print("Read Image from root")
+    bad_x,bad_y = readfile(args.database_path0)
+    good_x,good_y = readfile(args.database_path1)
+    """----------Image_transfer_np----------"""
+    if Image_transfer_np:
+        print("Image_transfer_np")
+        np.save(args.numpy_data_path+'bad_x.npy',bad_x)
+        np.save(args.numpy_data_path+'bad_y.npy',bad_y)
+        np.save(args.numpy_data_path+'good_x.npy',good_x)
+        np.save(args.numpy_data_path+'good_y.npy',good_y)
+    
+        bad_x=np.load(args.numpy_data_path+'bad_x.npy')
+        bad_y=np.load(args.numpy_data_path+'bad_y.npy')
+        good_x=np.load(args.numpy_data_path+'good_x.npy')
+        good_y=np.load(args.numpy_data_path+'good_y.npy')
+    """----------Image_transfer_np end----------"""
+    trainx=np.concatenate([bad_x,good_x])
+    trainy=np.concatenate([bad_y,good_y])
+    train_set=ImgDataset(trainx, trainy,train_transform)
+    train_loader=DataLoader(train_set,batch_size = args.batch_size,shuffle=True,pin_memory=True)
+    if check_image_module:
+        #check image
+        import matplotlib.pyplot as plt
+        plt.figure(dpi=600)
+        #close 座標刻度與座標軸
+        plt.xticks([])
+        plt.yticks([])
+        plt.axis('off')
+        plt.imshow(trainx[0])
+        plt.show()
+    return train_set,train_loader
+def device_auto_detect():
+    device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
+    print(f'device:{device}')
+    return device
+def model_select(device='cpu'):
+    if args.model == 'resnet18':
+        from torchvision.models import resnet18
+        model = resnet18(progress=False,num_classes=args.num_classes).to(device)
+    elif args.model == 'mobilenetv3_small':
+        from torchvision.models import mobilenet_v3_small
+        model = mobilenet_v3_small(progress=False,num_classes= args.num_classes).to(device)
+    else:
+        print("dont know the model name")
+    print(f"Select model:{args.model}")
+    return model
+def loss_select():
+    if args.loss == 'CrossEntropyLoss':
+        loss = nn.CrossEntropyLoss()
+    else:
+        print("unknown loss function")
+    print(f"Select loss function:{args.loss}")
+    return loss
 def model_eval():
     test_acc = 0.0
     test_loss = 0.0
@@ -113,7 +221,7 @@ def create_confusion_matrix_picture():
 """----------function end----------"""
 
 if __name__ == '__main__':
-    test_set,test_loader =ds_preprocessing()
+    test_set,test_loader = ds_preprocessing()
     device = device_auto_detect()
     model = model_select(device)
     load_model(model)
