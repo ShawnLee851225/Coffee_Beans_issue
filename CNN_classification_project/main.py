@@ -7,7 +7,6 @@ Created on 2023/05/08
 """----------import package----------"""
 import argparse
 import os
-import time
 import numpy as np
 import pandas as pd
 import torch
@@ -17,12 +16,13 @@ from torch.utils.data import DataLoader, Dataset
 from torchsummary import summary
 from torchvision import transforms
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
 
 """----------import package end----------"""
 
 """----------variable init----------"""
 train_point=[]
-#test_point=[] not use
+test_point=[]
 best_acc=0.0
 #metrics=np.zeros((2,2),dtype=np.int32)
 label_map ={
@@ -40,6 +40,7 @@ check_image_module = False  #Check image is normal
 show_line_graph_switch = True 
 save_training_progress_csv_switch =True  
 model_save_switch =True
+model_eval_switch = True
 """----------module switch setting end----------"""
 
 """----------argparse init----------"""
@@ -53,7 +54,7 @@ if argparse_module:
     parser.add_argument('--image_size',type=int,default= 50,help='image size')
     parser.add_argument('--num_classes',type=int,default= 2,help='num classes')
     parser.add_argument('--batch_size',type=int,default= 64,help='batch_size')
-    parser.add_argument('--num_epoch',type=int,default= 50,help='num_epoch')
+    parser.add_argument('--num_epoch',type=int,default= 25,help='num_epoch')
     parser.add_argument('--model',type= str,default='mobilenetv3_small',help='option: resnet18 , mobilenetv3_small')
     parser.add_argument('--optimizer',type= str,default='Ranger',help='option: Adam, RAdam, Ranger, SGD')
     parser.add_argument('--loss',type= str,default='CrossEntropyLoss',help='Loss')
@@ -171,8 +172,12 @@ def ds_preprocessing():
     """----------Image_transfer_np end----------"""
     trainx=np.concatenate([bad_x,good_x])
     trainy=np.concatenate([bad_y,good_y])
+    trainx,testx ,trainy ,testy = train_test_split(trainx,trainy,random_state=10, train_size=0.8)
+    print(trainx.shape,trainy.shape,testx.shape, testy.shape)
     train_set=ImgDataset(trainx, trainy,train_transform)
     train_loader=DataLoader(train_set,batch_size = args.batch_size,shuffle=True,pin_memory=True)
+    test_set=ImgDataset(testx, testy,train_transform)
+    test_loader=DataLoader(test_set,batch_size = args.batch_size,shuffle=True,pin_memory=True)
     if check_image_module:
         print("check image")
         #check image
@@ -184,11 +189,12 @@ def ds_preprocessing():
         plt.axis('off')
         plt.imshow(trainx[0])
         plt.show()
-    return train_set,train_loader
+    return train_set,train_loader,test_set,test_loader
 def model_train():
-    epoch_start_time = time.time()
     train_acc = 0.0
     train_loss = 0.0
+    test_acc = 0.0
+    test_loss= 0.0
     model.train()
     for i, data in enumerate(train_loader):
         optimizer.zero_grad()   # 用 optimizer 將 model 參數的 gradient 歸零
@@ -201,7 +207,21 @@ def model_train():
     train_acc_percent = train_acc/train_set.__len__()
     train_loss_average = train_loss/train_set.__len__()
     train_point.append((train_acc_percent,train_loss_average))
-    pbar.set_postfix({'Train Acc':train_acc_percent,'Train loss':train_loss_average})   
+    model.eval()
+    if model_eval_switch:
+        with torch.no_grad():
+            for j, data in enumerate(test_loader):
+                test_pred = model(data[0].to(device))
+                test_acc += np.sum(np.argmax(test_pred.cpu().data.numpy(), axis=1) == data[1].numpy())
+                batch_loss = loss(test_pred, data[1].to(device)) 
+                test_loss += batch_loss.item()
+            test_acc_percent = test_acc/test_set.__len__()
+            test_loss_average = test_loss/test_set.__len__()
+            test_point.append((test_acc_percent,test_loss_average))
+            pbar.set_postfix({'Train Acc':train_acc_percent,'Train loss':train_loss_average,\
+                            'Test Acc':test_acc_percent, 'Test loss':test_loss_average})   
+    else:
+        pbar.set_postfix({'Train Acc':train_acc_percent,'Train loss':train_loss_average,}) 
     if (epoch+1) == args.num_epoch:
         if model_save_switch:
             save_model()
@@ -215,15 +235,25 @@ def show_line_graph():
     import matplotlib.pyplot as plt
 
     trainp = list(zip(*train_point))
-
-    plt.figure(figsize=(8,4),dpi=100)
-    plt.subplot(2,2,1, title='Accuracy (train)').plot(trainp[0])
-    plt.subplot(2,2,2, title='loss (train)').plot(trainp[1])
-    plt.savefig(args.training_data_path+args.model+'.png')
+    if model_eval_switch:
+        testp = list(zip(*train_point))
+        plt.figure(figsize=(8,8),dpi=100)
+        plt.subplot(2,2,1, title='Accuracy (train)').plot(trainp[0])
+        plt.subplot(2,2,2, title='loss (train)').plot(trainp[1])
+        plt.subplot(2,2,3, title='Accuracy (test)').plot(testp[0])
+        plt.subplot(2,2,4, title='loss (test)').plot(testp[1])
+        plt.savefig(args.training_data_path+args.model+'.png')
+    else:
+        plt.figure(figsize=(8,4),dpi=100)
+        plt.subplot(2,2,1, title='Accuracy (train)').plot(trainp[0])
+        plt.subplot(2,2,2, title='loss (train)').plot(trainp[1])
+        plt.savefig(args.training_data_path+args.model+'.png')
     #plt.show() can close
 def save_training_progress_csv():
     np.savetxt( args.training_data_path + args.model +'.csv', train_point,delimiter=',',fmt = '% s')
-    df =pd.DataFrame(train_point)
+    df = list(zip(*train_point)) + list(zip(*test_point))
+    df = list(zip(*df))
+    df =pd.DataFrame(df)
     df.to_excel(args.training_data_path + args.model + '.xlsx', index=True)
     #np.savetxt('ours_test.csv', test_point,delimiter=',',fmt = '% s') not use
 """----------function end----------"""
@@ -231,7 +261,7 @@ def save_training_progress_csv():
 """----------main----------"""
 if __name__ == '__main__':
     """----------data preprocessing----------"""
-    train_set,train_loader =ds_preprocessing()
+    train_set,train_loader,test_set,test_loader =ds_preprocessing()
     """----------data preprocessing end----------"""
 
     device = device_auto_detect()
