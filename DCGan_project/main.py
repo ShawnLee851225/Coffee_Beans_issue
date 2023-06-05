@@ -3,6 +3,7 @@
 Created on 2023/05/10
 tech:
 (Real=False, fake=True)
+Adam beta1 set 0.5
 
 @author: Shawn YH Lee
 """
@@ -37,7 +38,7 @@ argparse_module = True  #don't False
 tqdm_module =True
 torchsummary_module = True
 show_GANloss_switch = True
-load_modelweights = False
+load_modelweights = True
 """----------module switch setting end----------"""
 """----------argparse init----------"""
 if argparse_module:    
@@ -47,19 +48,19 @@ if argparse_module:
     parser.add_argument('--modelpath',type=str,default='./model/',help='output model save path')
     parser.add_argument('--numpy_data_path',type=str,default='./numpydata/',help='output numpy data')
     parser.add_argument('--training_data_path',type=str,default='./training_process_data/',help='output training data path')
-    parser.add_argument('--image_size',type=int,default= 400,help='image size')
+    parser.add_argument('--image_size',type=int,default= 64,help='image size')
     parser.add_argument('--num_classes',type=int,default= 2,help='num classes')
     parser.add_argument('--batch_size',type=int,default= 64,help='batch_size')
     parser.add_argument('--num_epoch',type=int,default= 100,help='num_epoch')
-    parser.add_argument('--nz',type=int,default= 50)
+    parser.add_argument('--nz',type=int,default= 100)
     parser.add_argument('--ngf',type=int,default= 16)
     parser.add_argument('--ndf',type=int,default= 16)
     parser.add_argument('--nc',type=int,default= 3)
 
     parser.add_argument('--modelD',type= str,default='modelD')
     parser.add_argument('--modelG',type= str,default='modelG')
-    parser.add_argument('--lrG',type= int,default=1e-3,help='lr for netG')
-    parser.add_argument('--lrD',type= int,default=1e-3,help='lr for NetD')
+    parser.add_argument('--lrG',type= float,default=2e-4,help='lr for netG')
+    parser.add_argument('--lrD',type= float,default=2e-4,help='lr for NetD')
 
     args = parser.parse_args()
 """----------argparse init end----------"""
@@ -92,23 +93,23 @@ def show_loss_graph():
 """----------main----------"""
 if __name__ == '__main__':
     
-    train_set = datasets.ImageFolder(root=args.database_path1,transform=train_transform) #輸出(圖片tensor,label)
+    train_set = datasets.ImageFolder(root=args.database_path,transform=train_transform) #輸出(圖片tensor,label)
     train_loader = DataLoader(dataset = train_set,batch_size = args.batch_size,shuffle=True,pin_memory=True)
 
     device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
     print(f'device:{device}')
     image_shape = (3,args.image_size,args.image_size)
 
-    #modelG = dcgan.NetG(args.nz,args.ngf,args.nc).to(device)
-    #modelD = dcgan.NetD(args.nc,args.ndf).to(device)
-    modelD = dcgan.NetD_custom(args.nc,args.ndf).to(device)
-    modelG = dcgan.NetG_custom(args.nz,args.ngf,args.nc).to(device)
+    modelG = dcgan.NetG(args.nz,args.ngf,args.nc).to(device)
+    modelD = dcgan.NetD(args.nc,args.ndf).to(device)
+    # modelD = dcgan.NetD_custom(args.nc,args.ndf).to(device)
+    # modelG = dcgan.NetG_custom(args.nz,args.ngf,args.nc).to(device)
     if load_modelweights:
         modelG.load_state_dict(torch.load(args.modelpath+args.modelG+'.pth'))
         modelD.load_state_dict(torch.load(args.modelpath+args.modelD+'.pth'))
     
-    optimizerG = torch.optim.Adam(modelG.parameters(), lr=args.lrG,amsgrad=False)
-    optimizerD = torch.optim.Adam(modelD.parameters(), lr=args.lrD,amsgrad=False)
+    optimizerG = torch.optim.Adam(modelG.parameters(), lr=args.lrG,amsgrad=False,betas=(0.5, 0.999))
+    optimizerD = torch.optim.Adam(modelD.parameters(), lr=args.lrD,amsgrad=False,betas=(0.5, 0.999))
     loss = nn.BCELoss()
     if tqdm_module:
         pbar = tqdm(range(args.num_epoch),desc='Epoch',unit='epoch',maxinterval=1)
@@ -120,24 +121,26 @@ if __name__ == '__main__':
         modelD.train()
         modelG.train()
         for i ,data in enumerate(train_loader):
-            #train modelD let true image be 1
+            #train modelD let true image be 0
             modelD.zero_grad()
             train_pred = modelD(data[0].to(device)).view(-1)
             label_true = torch.full((data[0].size(0),),0,dtype=torch.float,device=device)
             batch_loss_true = loss(train_pred, label_true)
+            batch_loss_true.backward()
+            optimizerD.step()
 
             #modelG create fakeimage
             noise = torch.randn(data[0].size(0),args.nz,1,1).to(device)
             fake = modelG(noise)
 
-            #trian modelD fake image be 0
+            #trian modelD fake image be 1
             label_false = torch.full((data[0].size(0),),1,dtype=torch.float,device=device)  
             train_pred = modelD(fake.detach()).view(-1)#.detach()不計算此tensor梯度
             batch_loss_false = loss(train_pred, label_false)
             # update model D
-            batch_loss_modelD = (batch_loss_true + batch_loss_false) / 2
-            batch_loss_modelD.backward()
+            batch_loss_false.backward()
             optimizerD.step()
+            batch_loss_modelD = (batch_loss_true + batch_loss_false) / 2
 
             # train model G fake vector
             modelG.zero_grad()
@@ -158,11 +161,11 @@ if __name__ == '__main__':
                 # fake image
                 noise = torch.randn(1,args.nz,1,1).to(device)
                 fake = modelG(noise.detach())
-                fake_image = transforms.ToPILImage()(fake[0].cpu()).convert('RGB')
+                fake_image = transforms.ToPILImage()((fake[0].cpu()+1)/2).convert('RGB')
                 fake_image.save(args.training_data_path + str(epoch+1) + "fake.jpg")
                 # save model
-    torch.save(modelD.state_dict(), args.modelpath +args.modelD + '.pth')
-    torch.save(modelG.state_dict(), args.modelpath +args.modelG + '.pth')
+                torch.save(modelD.state_dict(), args.modelpath +args.modelD + '.pth')
+                torch.save(modelG.state_dict(), args.modelpath +args.modelG + '.pth')
     if show_GANloss_switch:
         show_loss_graph()
 
