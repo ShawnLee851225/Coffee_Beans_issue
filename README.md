@@ -1,10 +1,7 @@
 # Coffee_Beans_issue
 About coffee beans database with Deep learning
 
-<figure class="half">
-    <img src="./CNN_classification_project/database/good/Set04-good.01.01.jpg" >
-    <img src="./CNN_classification_project/database/bad/Set05-bad.02.01.jpg" >
-</figure>
+![Good](./CNN_classification_project/database/good/Set04-good.01.01.jpg) | ![Bad](./CNN_classification_project/database/bad/Set05-bad.02.01.jpg)
 
 ## Model parameter setting
 optimizer = Adam, loss = CEloss, lr = 1e-3
