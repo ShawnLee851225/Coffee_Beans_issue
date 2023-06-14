@@ -4,6 +4,8 @@ About coffee beans database with Deep learning
 ![Good](./CNN_classification_project/database/good/Set04-good.01.01.jpg) | ![Bad](./CNN_classification_project/database/bad/Set05-bad.02.01.jpg)
 
 ## Model parameter setting
+image_size =50*50, batch size=64, num classes =2, num epoch=25
+
 optimizer = Adam, loss = CEloss, lr = 1e-3
 
 normalization =>mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225]
