@@ -1,7 +1,9 @@
 # Coffee_Beans_issue
 About coffee beans database with Deep learning
 
-![Good](./CNN_classification_project/database/good/Set04-good.01.01.jpg) | ![Bad](./CNN_classification_project/database/bad/Set05-bad.02.01.jpg)
+<center class="half">
+<img src=./CNN_classification_project/database/good/Set04-good.01.01.jpg width=30% /><img src=./CNN_classification_project/database/bad/Set05-bad.02.01.jpg width=30% />
+</center>
 
 ## Model parameter setting
 image_size =50*50, batch size=64, num classes =2, num epoch=25
